@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="695" height="326" viewBox="0 0 695 326" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13">
+<rect width="695" height="326" rx="8" fill="#0d1117" stroke="#30363d"/>
+<rect width="695" height="34" rx="8" fill="#161b22"/>
+<rect y="26" width="695" height="8" fill="#161b22"/>
+<circle cx="18" cy="17" r="5" fill="#ff5f56"/>
+<circle cx="36" cy="17" r="5" fill="#ffbd2e"/>
+<circle cx="54" cy="17" r="5" fill="#27c93f"/>
+<text x="72" y="22" fill="#8b949e">S3 refuses a public policy  (real AWS, $0)</text>
+<text x="16" y="54" fill="#8b949e" xml:space="preserve"># the audit-log bucket is hardened. try to make it public and watch S3 refuse.</text>
+<text x="16" y="94" fill="#7ee787">$</text><text x="33" y="94" fill="#c9d1d9">aws s3api put-bucket-policy --bucket lab09-cloudtrail-&lt;ACCOUNT&gt; \</text>
+<text x="16" y="114" fill="#c9d1d9" xml:space="preserve">    --policy &#x27;{ ... &quot;Principal&quot;:&quot;*&quot;, &quot;Action&quot;:&quot;s3:GetObject&quot; ... }&#x27;</text>
+<text x="16" y="154" fill="#f85149" xml:space="preserve">aws: [ERROR]: An error occurred (AccessDenied) when calling the </text>
+<text x="16" y="174" fill="#c9d1d9" xml:space="preserve">PutBucketPolicy operation: User: arn:aws:iam::&lt;ACCOUNT&gt;:user/pam-labs-cli </text>
+<text x="16" y="194" fill="#f85149" xml:space="preserve">is not authorized to perform: s3:PutBucketPolicy on resource: </text>
+<text x="16" y="214" fill="#c9d1d9" xml:space="preserve">&quot;arn:aws:s3:::lab09-cloudtrail-&lt;ACCOUNT&gt;&quot; because public policies are </text>
+<text x="16" y="234" fill="#c9d1d9" xml:space="preserve">prevented by the BlockPublicPolicy setting in S3 Block Public Access.</text>
+<text x="16" y="274" fill="#8b949e" xml:space="preserve"># S3 names BlockPublicPolicy in the denial. the control refused a real request,</text>
+<text x="16" y="294" fill="#8b949e" xml:space="preserve"># it is not merely present in the template.</text>
+</svg>

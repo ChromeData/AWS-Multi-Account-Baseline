@@ -1,0 +1,23 @@
+Test run: 2026-08-12 00:37:53
+Host: Windows 11, Python Python 3.14.0
+Command: python -m pytest tests/ -v
+============================================================
+============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0 -- C:\Python314\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\SnatchedYourChain\Downloads\pam-cloud-labs-extracted\pam-cloud-labs\09-aws-multiaccount-baseline
+plugins: anyio-4.12.1, langsmith-0.7.10
+collecting ... collected 9 items
+
+tests/test_triage.py::TestStatusAndSeverity::test_fail_variants_all_count_as_failing PASSED [ 11%]
+tests/test_triage.py::TestStatusAndSeverity::test_pass_is_not_a_failure PASSED [ 22%]
+tests/test_triage.py::TestStatusAndSeverity::test_severity_falls_back_across_shapes PASSED [ 33%]
+tests/test_triage.py::TestRollup::test_counts_by_severity PASSED         [ 44%]
+tests/test_triage.py::TestRollup::test_counts_by_service PASSED          [ 55%]
+tests/test_triage.py::TestRollup::test_empty_input_is_safe PASSED        [ 66%]
+tests/test_triage.py::TestLoad::test_reads_json_array PASSED             [ 77%]
+tests/test_triage.py::TestLoad::test_tolerates_jsonl PASSED              [ 88%]
+tests/test_triage.py::TestLoad::test_skips_empty_files PASSED            [100%]
+
+============================== 9 passed in 0.02s ==============================
+

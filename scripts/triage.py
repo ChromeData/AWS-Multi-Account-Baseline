@@ -1,0 +1,129 @@
+#!/usr/bin/env python3
+"""Summarise Prowler OCSF-JSON findings by severity into findings/triage.md.
+
+Prowler writes one JSON object per finding (OCSF). This rolls them up so you can
+see the shape of the run and drive it down deliberately. Usage:
+
+    python3 scripts/triage.py findings/*.ocsf.json
+"""
+import glob
+import json
+import sys
+from collections import Counter, defaultdict
+from pathlib import Path
+
+FINDINGS = Path(__file__).resolve().parent.parent / "findings"
+
+
+def load(paths):
+    items = []
+    for p in paths:
+        text = Path(p).read_text().strip()
+        if not text:
+            continue
+        # Prowler OCSF output is usually a JSON array; tolerate JSONL too.
+        try:
+            data = json.loads(text)
+            items.extend(data if isinstance(data, list) else [data])
+        except json.JSONDecodeError:
+            for line in text.splitlines():
+                line = line.strip()
+                if line:
+                    items.append(json.loads(line))
+    return items
+
+
+# OCSF severity_id is an integer enum, not a label. The report renders named
+# severities, so an id has to be translated or the finding is counted and then
+# never displayed.
+#
+# https://schema.ocsf.io/objects/finding — 0 Unknown .. 6 Fatal.
+OCSF_SEVERITY = {
+    0: "Unknown",
+    1: "Informational",
+    2: "Low",
+    3: "Medium",
+    4: "High",
+    5: "Critical",
+    6: "Critical",  # Fatal; folded into Critical, nothing renders "Fatal"
+}
+
+
+def sev(item):
+    """Severity as a display label.
+
+    The fallback to severity_id was already here and was broken: it returned
+    the raw integer, which stringifies to "4" and matches none of the named
+    rows the report iterates. A finding arriving with severity_id and no
+    severity string was counted in the total and then silently omitted from
+    the severity table, so the report read "failing: 12" above an empty list.
+
+    Confirmed with a two-finding rollup: 2 counted, 0 displayed.
+    """
+    s = item.get("severity")
+    if s:
+        return str(s)
+
+    sid = item.get("severity_id")
+    if sid is not None:
+        # Two shapes in the wild. OCSF proper puts an integer enum here, but
+        # some exporters put the label straight in. Map the integer; pass a
+        # non-numeric string through as the label it already is.
+        try:
+            return OCSF_SEVERITY.get(int(sid), "Unknown")
+        except (TypeError, ValueError):
+            return str(sid)
+
+    return str(item.get("finding_info", {}).get("severity") or "Unknown")
+
+
+def status(item):
+    return (item.get("status_code") or item.get("status") or "").upper()
+
+
+def service_of(item):
+    return (item.get("resources", [{}])[0].get("group", {}).get("name")
+            or item.get("cloud", {}).get("service") or "unknown")
+
+
+def rollup(items):
+    """The scoring core: split failing findings out and count them by severity
+    and service. Pure, so tests exercise the exact aggregation the report uses."""
+    fails = [i for i in items if status(i) in ("FAIL", "FAILED", "NEW")]
+    by_sev = Counter(str(sev(i)) for i in fails)
+    by_service = defaultdict(int)
+    for i in fails:
+        by_service[str(service_of(i))] += 1
+    return fails, by_sev, by_service
+
+
+def main():
+    paths = sys.argv[1:] or glob.glob(str(FINDINGS / "*.json"))
+    if not paths:
+        sys.exit("no Prowler JSON found, run 'make scan' first")
+
+    items = load(paths)
+    fails, by_sev, by_service = rollup(items)
+
+    lines = ["# Prowler Triage\n",
+             f"Total findings parsed: **{len(items)}** · failing: **{len(fails)}**\n",
+             "## By severity\n"]
+    for s in ("Critical", "High", "Medium", "Low", "Informational", "Unknown"):
+        if by_sev.get(s):
+            lines.append(f"- **{s}:** {by_sev[s]}")
+    lines.append("\n## Top failing services\n")
+    for svc, n in sorted(by_service.items(), key=lambda x: -x[1])[:15]:
+        lines.append(f"- {svc}: {n}")
+    lines.append("\n## Remediation log\n")
+    lines.append("| Finding | Severity | Real risk? | Action |")
+    lines.append("|---------|----------|-----------|--------|")
+    lines.append("| | | | |")
+
+    out = FINDINGS / "triage.md"
+    out.write_text("\n".join(lines) + "\n")
+    print(f"wrote {out}")
+    print(f"failing findings: {len(fails)}, {dict(by_sev)}")
+
+
+if __name__ == "__main__":
+    main()
