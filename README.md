@@ -1,86 +1,56 @@
-# Lab 09 — AWS Multi-Account Security Baseline
+# Lab 09: AWS Multi Account Security Baseline
 
 [![tests](https://github.com/ChromeData/AWS-Multi-Account-Baseline/actions/workflows/tests.yml/badge.svg)](https://github.com/ChromeData/AWS-Multi-Account-Baseline/actions/workflows/tests.yml)
 
-**Real companies have dozens of AWS accounts, not one. This lays down the
-security services AWS says every account needs, scans the whole thing with
-Prowler, and drives the findings to zero — the org-wide control plane, not a
-hobby project.**
+**Real companies have dozens of AWS accounts, not one. This lays down the security services AWS says every account needs, scans the whole thing with Prowler, and drives the findings to zero. The org wide control plane, not a hobby project.**
 
 | | |
 |---|---|
-| **Domains** | AWS · security |
-| **Built on** | [prowler-cloud/prowler](https://github.com/prowler-cloud/prowler) (Apache-2.0) · [aws-security-reference-architecture-examples](https://github.com/aws-samples/aws-security-reference-architecture-examples) (MIT-0) |
-| **Cost** | ~$2–5 · **Runtime** ~5 hours |
-| **Status** | 🟡 Built, validated, not yet applied |
+| **Domains** | AWS, security |
+| **Built on** | [prowler-cloud/prowler](https://github.com/prowler-cloud/prowler), [aws security reference architecture](https://github.com/aws-samples/aws-security-reference-architecture-examples) |
+| **Cost** | ~$2 to $5. **Runtime** ~5 hours |
+| **Status** | Built, validated, not yet applied |
 
----
+## Situation
 
-## The point
+A single hardened account is a lab exercise. A hardened organization is the job. The AWS reference architecture describes how the security services should sit across accounts: GuardDuty, Security Hub, Config, Access Analyzer, CloudTrail, delegated admin.
 
-A single hardened account is a lab exercise; a hardened *organization* is the job.
-The AWS SRA describes how the security services should be laid out — GuardDuty,
-Security Hub, Config, Access Analyzer, CloudTrail, delegated admin. This builds a
-scaled-down version and proves it with Prowler, the same tool that would audit it
-in production.
+## Task
 
-## What it lays down
+Build a scaled down version of that layout and prove it with Prowler, the same tool that would audit it in production.
 
-- **CloudTrail** — multi-region, log-file validation, feeding an encrypted
-  versioned bucket
-- **GuardDuty** — threat detection
-- **Security Hub** — with CIS Foundations + AWS FSBP standards enabled
-- **IAM Access Analyzer** — external-access findings
-- The org/delegated-admin wiring is commented in, showing where the multi-account
-  version plugs in
+## Action
 
-## The baseline passes its own audit
+It lays down CloudTrail (multi region, log file validation, feeding an encrypted versioned bucket), GuardDuty, Security Hub with CIS and AWS best practice standards, and IAM Access Analyzer. The org and delegated admin wiring is commented in, showing where the multi account version plugs in.
 
-A security baseline whose own audit-log bucket is unencrypted and world-readable
-is the joke that writes itself. The CloudTrail bucket ships with a public-access
-block, KMS encryption, versioning, and a least-privilege bucket policy — so
-**Prowler doesn't flag the baseline's own infrastructure.** That was a real gap
-in the first cut; it's fixed and the history shows it.
+The Prowler output gets rolled up by [scripts/triage.py](./scripts/triage.py), sorted by severity and service, so you can drive it down on purpose.
 
-## The triage step is tested
+## Result
 
-[`scripts/triage.py`](./scripts/triage.py) rolls Prowler's OCSF-JSON output up by
-severity and service so you can drive it down deliberately. That aggregation is
-the number you act on, so it has **9 offline tests** on synthetic findings — no
-AWS needed — covering the FAIL/FAILED/NEW status variants, severity fallback
-across OCSF shapes, and both JSON-array and JSONL inputs.
+The baseline passes its own audit. A security baseline whose own log bucket is unencrypted and world readable is the joke that writes itself, so the CloudTrail bucket ships with a public access block, KMS encryption, versioning, and a least privilege policy. That was a real gap in the first cut, fixed and in the history.
 
-```bash
-python -m pytest tests/ -v
-```
+The triage roller has 9 offline tests on fake findings (the FAIL, FAILED, and NEW status variants, severity fallback across export shapes, and both JSON and JSONL inputs), because a miscounted Critical is the worst bug in a triage tool. CI runs the tests plus `terraform validate`.
 
-CI runs the tests plus `terraform validate`.
+## What I did not build
 
-## What I didn't build
+Prowler and the reference architecture are upstream. The baseline config, the self hardened bucket, the triage roller, and the tests are mine.
 
-Prowler and the SRA are upstream. The baseline configuration, the self-hardened
-audit bucket, the triage roller, and the tests are mine.
-
----
-
-## Running it
+## Run it
 
 ```bash
 terraform -chdir=terraform init
 terraform -chdir=terraform apply
-make scan                              # prowler -> findings/*.ocsf.json
+make scan
 python scripts/triage.py findings/*.json
 terraform -chdir=terraform destroy
 ```
 
-Needs Terraform ≥ 1.9, Prowler, Python 3, and an AWS account (throwaway).
+Needs Terraform 1.9+, Prowler, Python 3, and a throwaway AWS account.
 
 ## Findings
 
-`findings/triage.md` is generated by the triage step. [LAB-NOTES.md](./LAB-NOTES.md)
-is the log.
+`findings/triage.md` comes from the triage step. [LAB-NOTES.md](./LAB-NOTES.md) is the log.
 
 ## License
 
-Lab code: MIT ([LICENSE](./LICENSE)). Upstream tools keep their licenses, credited
-above.
+Lab code: MIT ([LICENSE](./LICENSE)). Upstream tools keep their licenses, credited above.
