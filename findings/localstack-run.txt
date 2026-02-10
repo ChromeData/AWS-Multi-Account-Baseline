@@ -1,0 +1,90 @@
+Trail bucket applied and audited on LocalStack
+Date: 2026-08-12
+No AWS account. No cost.
+======================================================================
+
+SCOPE, AND ITS LIMIT
+
+  GuardDuty, Security Hub, Access Analyzer and CloudTrail itself are
+  LocalStack Pro features. The community image does not implement them, so
+  the detection half of this baseline cannot run locally at all. Prowler
+  likewise needs a real account to say anything meaningful.
+
+  What CAN run is S3, and that is not a consolation prize: the trail bucket
+  is where the audit evidence lives. Whether it can be read, tampered with,
+  or written to by the wrong party is decided entirely by four S3 controls
+  and a bucket policy.
+
+  Applied with -target on the five S3 resources. A full apply hangs on
+  CloudTrail.
+
+TWO PROVIDER SETTINGS THIS NEEDED
+
+  s3_use_path_style must be true. LocalStack serves S3 from one host, so
+  virtual-host addressing (bucket.s3.amazonaws.com) does not resolve.
+
+  skip_requesting_account_id must stay FALSE here, unlike the other labs.
+  The bucket name interpolates data.aws_caller_identity.me.account_id, and
+  skipping the lookup leaves it unresolved; the provider then dies with a
+  bare "plugin failed to respond" that names the bucket resource and
+  explains nothing. LocalStack implements STS GetCallerIdentity, so the
+  lookup simply works.
+
+VERIFIED FROM THE S3 API
+
+  public access block   all four flags true
+  encryption            aws:kms
+  versioning            Enabled
+  bucket policy         cloudtrail.amazonaws.com only, two statements
+
+FINDING: THE BUCKET POLICY WAS A CONFUSED DEPUTY
+
+  Reading the deployed policy back showed neither statement carried an
+  aws:SourceArn condition:
+
+    AWSCloudTrailAclCheck    Condition: {}
+    AWSCloudTrailWrite       Condition: {"s3:x-amz-acl": "bucket-owner-full-control"}
+
+  The principal is the CloudTrail SERVICE, cloudtrail.amazonaws.com, which
+  is not scoped to an account. Without aws:SourceArn the policy trusts
+  CloudTrail globally rather than this account's trail, which is the
+  cross-account confused-deputy pattern AWS has documented since 2022 and
+  now writes into its own console-generated policies.
+
+  In a lab whose source comment reads "a security baseline whose own
+  audit-log bucket is unencrypted and world-readable is the joke that writes
+  itself". The encryption and public access were fine. The trust boundary on
+  the policy was not.
+
+  Fixed on both statements. Re-applied and confirmed on the deployed object:
+
+    AWSCloudTrailAclCheck  aws:SourceArn = arn:aws:cloudtrail:us-east-1:000000000000:trail/lab09-baseline-trail
+    AWSCloudTrailWrite     aws:SourceArn = arn:aws:cloudtrail:us-east-1:000000000000:trail/lab09-baseline-trail
+
+  The ARN is composed from parts rather than read from aws_cloudtrail.baseline.arn,
+  because the trail depends_on the bucket policy (CloudTrail rejects a bucket
+  whose policy does not yet permit it) and referencing the resource is a
+  dependency cycle.
+
+SEPARATE FINDING: TRIAGE SILENTLY DROPPED FINDINGS
+
+  scripts/triage.py counted findings whose severity arrived as OCSF
+  severity_id rather than a severity string, then never displayed them. The
+  fallback returned the raw integer, "4", which matches none of the named
+  rows the report iterates. A report reading "failing: 12" above an empty
+  severity table.
+
+  Reproduced with a two-finding rollup: 2 counted, 0 displayed.
+
+  Fixed with the OCSF enum mapping (0 Unknown .. 6 Fatal, Fatal folded into
+  Critical since nothing renders a Fatal row). The first version of the fix
+  broke an existing test that puts a LABEL in severity_id, which some
+  exporters do; both shapes are handled now and both are pinned by tests.
+  14 tests pass, up from 9.
+
+STATUS
+
+  Trail bucket:       applied and audited, one real finding fixed.
+  Triage rollup:      bug fixed, regressions pinned.
+  GuardDuty/Hub/AA:   not runnable locally, unchanged.
+  Prowler scoring:    still needs a real account.
