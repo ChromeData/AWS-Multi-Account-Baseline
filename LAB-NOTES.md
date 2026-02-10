@@ -69,4 +69,36 @@ the worst possible bug in a triage tool.
 
 ## Log
 
-_(first entry goes here on the first real apply)_
+### 2026-08-12 — the baseline would have failed its own scan
+
+Reviewing `main.tf` before the first apply, the CloudTrail bucket had no encryption,
+no public-access block, no versioning, and no bucket policy.
+
+Prowler would have flagged the security baseline's own audit-log bucket. A baseline
+that fails the audit it exists to enable is worse than no baseline, because it lands
+in the report as noise and trains people to ignore the findings.
+
+**Fixed before applying:** public-access block, KMS encryption, versioning, and a
+bucket policy scoped to CloudTrail's two required actions.
+
+Also added `depends_on = [aws_s3_bucket_policy.trail]`. CloudTrail validates it can
+write at create time, and without the ordering the apply fails with an "insufficient
+bucket permissions" error that doesn't name the race as the cause.
+
+---
+
+### 2026-08-12 — severity fallback in the triage roller
+
+OCSF exports don't agree on where severity lives: sometimes `severity`, sometimes
+`severity_id`, sometimes nested under `finding_info`. Same for status, which shows up
+as `FAIL`, `FAILED`, or `NEW` depending on the exporter.
+
+A miscounted Critical is the worst possible bug in a triage tool, because you drive
+the wrong findings to zero and believe you're done. Both fallbacks are pinned by
+tests.
+
+Final run: **9 passed** (`findings/test-run.txt`).
+
+**Deliberately left off:** the AWS Config recorder, commented in `main.tf`. It's the
+single biggest cost lever here and I want a clean Prowler run without it first, so I
+can attribute the cost and the finding-count change separately.
