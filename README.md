@@ -30,9 +30,16 @@ The Prowler output gets rolled up by [scripts/triage.py](./scripts/triage.py), s
 
 ## Result
 
-The baseline passes its own audit. A security baseline whose own log bucket is unencrypted and world readable is the joke that writes itself, so the CloudTrail bucket ships with a public access block, KMS encryption, versioning, and a least privilege policy. That was a real gap in the first cut, fixed and in the history.
+**The baseline passes its own audit, and the audit bucket was observed refusing to go public on real AWS.** A security baseline whose own log bucket is world-readable is the joke that writes itself, so the CloudTrail bucket ships with a public-access block, KMS encryption, versioning, and a least-privilege policy. Reading config back is not proof, so I tried to make it public on a live account and let S3 refuse:
 
-The triage roller has 9 offline tests on fake findings (the FAIL, FAILED, and NEW status variants, severity fallback across export shapes, and both JSON and JSONL inputs), because a miscounted Critical is the worst bug in a triage tool. CI runs the tests plus `terraform validate`.
+```
+AccessDenied ... because public policies are prevented by the
+BlockPublicPolicy setting in S3 Block Public Access.
+```
+
+AWS names the control in the denial — it enforced, it wasn't just present. The same run confirmed the fix to a subtler hole: the bucket policy trusted the CloudTrail *service* globally until I scoped it with `aws:SourceArn` to this account's trail — the confused-deputy pattern AWS has documented since 2022. Cost `$0`, the billable detection services (GuardDuty, Security Hub) deliberately left off. Full output in [findings/real-aws-run.txt](./findings/real-aws-run.txt).
+
+<sub>The triage roller that scores the findings has 14 offline tests, because a miscounted Critical is the worst bug in a triage tool — one of them pins a real bug I hit where findings arriving as an OCSF integer severity were counted but silently dropped from the report. CI runs the tests plus `terraform validate`. In [LAB-NOTES.md](./LAB-NOTES.md).</sub>
 
 ## What I did not build
 
