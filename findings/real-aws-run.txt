@@ -1,0 +1,65 @@
+Baseline controls verified on real AWS, free resources only
+Date: 2026-08-12
+Cost: $0. Deliberately excluded everything billable.
+======================================================================
+
+WHAT WAS RUN, AND WHAT WAS NOT
+
+  The baseline config bundles free and paid services. Only the free ones
+  were applied, with -target:
+
+    RUN (free):
+      aws_s3_bucket.trail + its 4 hardening resources
+      aws_accessanalyzer_analyzer.baseline   (IAM Access Analyzer is free)
+
+    EXCLUDED (billable), on purpose:
+      aws_guardduty_detector      trial that converts to paid
+      aws_securityhub_account     per-check charges after the trial
+      aws_cloudtrail.baseline     first trail is free, but data events and
+                                  extra management trails are not, so left off
+
+  Confirmed at teardown that none of the excluded services were enabled
+  anywhere in the account.
+
+CONFUSED-DEPUTY FIX, CONFIRMED ON REAL AWS
+
+  The bucket policy that on LocalStack was shown to be missing aws:SourceArn
+  is correct on real AWS, with the real account ARN interpolated:
+
+    AWSCloudTrailAclCheck  SourceArn=arn:aws:cloudtrail:us-east-1:<ACCT>:trail/lab09-baseline-trail
+    AWSCloudTrailWrite     SourceArn=arn:aws:cloudtrail:us-east-1:<ACCT>:trail/lab09-baseline-trail
+
+  Both statements scoped to this account's trail, not the CloudTrail service
+  globally. The fix holds.
+
+PUBLIC ACCESS BLOCK, OBSERVED ENFORCING
+
+  Reading the config back is not proof it works. So I tried to make the
+  audit bucket public and let S3 refuse it:
+
+    aws s3api put-bucket-policy ... Principal:"*" ...
+
+    An error occurred (AccessDenied) when calling the PutBucketPolicy
+    operation: ... because public policies are prevented by the
+    BlockPublicPolicy setting in S3 Block Public Access.
+
+  AWS names BlockPublicPolicy in the denial. This is the control observed
+  refusing a real request, not merely present in the template. The same
+  distinction the boundary run in lab 06 cares about.
+
+ACCESS ANALYZER
+
+  lab09-account-analyzer: ACTIVE, type ACCOUNT. Live and analyzing, at no
+  cost.
+
+TEARDOWN AND BILLING SAFETY
+
+  6 resources destroyed. Full account sweep afterwards, all empty:
+  GuardDuty none, Security Hub not subscribed, 0 S3 buckets, 0 customer KMS
+  keys, 0 secrets, 0 CloudTrail trails, 0 Lambda functions.
+
+STILL NOT DONE
+
+  GuardDuty and Security Hub detection cannot be proven without incurring
+  charges, and Prowler scoring wants the full baseline. Those stay
+  config-verified, not run.

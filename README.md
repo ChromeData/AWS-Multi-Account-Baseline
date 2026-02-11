@@ -9,7 +9,7 @@
 | **Domains** | AWS, security |
 | **Built on** | [prowler-cloud/prowler](https://github.com/prowler-cloud/prowler), [aws security reference architecture](https://github.com/aws-samples/aws-security-reference-architecture-examples) |
 | **Cost** | ~$2 to $5. **Runtime** ~5 hours |
-| **Status** | Trail bucket applied and audited on LocalStack; found a missing aws:SourceArn confused-deputy gap, plus a triage bug dropping findings (findings/). GuardDuty/Hub need a real account |
+| **Status** | Free half run on real AWS: public-access block observed refusing a public-policy attempt, confused-deputy fix confirmed with real ARN (findings/real-aws-run.txt). GuardDuty/Security Hub stay config-only to avoid charges |
 
 ## Situation
 
