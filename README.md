@@ -1,75 +1,86 @@
 # Lab 09 — AWS Multi-Account Security Baseline
 
-**Stand up a mock multi-account AWS org, apply a security baseline drawn from the
-AWS Security Reference Architecture, then scan the whole thing with Prowler and
-drive the findings to zero — the org-wide control plane a senior AWS security
-engineer owns.**
+[![tests](https://github.com/ChromeData/AWS-Multi-Account-Baseline/actions/workflows/tests.yml/badge.svg)](https://github.com/ChromeData/AWS-Multi-Account-Baseline/actions/workflows/tests.yml)
+
+**Real companies have dozens of AWS accounts, not one. This lays down the
+security services AWS says every account needs, scans the whole thing with
+Prowler, and drives the findings to zero — the org-wide control plane, not a
+hobby project.**
 
 | | |
 |---|---|
 | **Domains** | AWS · security |
-| **Built on** | [prowler-cloud/prowler](https://github.com/prowler-cloud/prowler) (Apache-2.0) · [aws-samples/aws-security-reference-architecture-examples](https://github.com/aws-samples/aws-security-reference-architecture-examples) (MIT-0) |
-| **Runtime** | ~5 hours · ~$2–5 (mostly free control-plane services) |
-| **Status** | 🟡 In progress |
+| **Built on** | [prowler-cloud/prowler](https://github.com/prowler-cloud/prowler) (Apache-2.0) · [aws-security-reference-architecture-examples](https://github.com/aws-samples/aws-security-reference-architecture-examples) (MIT-0) |
+| **Cost** | ~$2–5 · **Runtime** ~5 hours |
+| **Status** | 🟡 Built, validated, not yet applied |
 
 ---
 
-## Why this lab exists
+## The point
 
 A single hardened account is a lab exercise; a hardened *organization* is the job.
-The AWS SRA describes how the security services should be laid out across accounts —
-GuardDuty, Security Hub, Config, IAM Access Analyzer, delegated admin. This lab
-builds a scaled-down version and then proves it with Prowler, which is the same tool
-that would audit it in production. Driving a Prowler run from dozens of findings to a
-justified near-zero is the artifact.
+The AWS SRA describes how the security services should be laid out — GuardDuty,
+Security Hub, Config, Access Analyzer, CloudTrail, delegated admin. This builds a
+scaled-down version and proves it with Prowler, the same tool that would audit it
+in production.
 
-## What I built
+## What it lays down
 
-- A **mock org** (AWS Organizations with a management account + a couple of member
-  accounts, or a single account with the same services if you're avoiding multi-
-  account cost) tagged and structured per SRA.
-- A **baseline**: GuardDuty, Security Hub, Config, Access Analyzer, and CloudTrail
-  org-trail turned on, with delegated administration where the SRA calls for it.
-- A **Prowler pipeline** producing a compliance report against CIS + the AWS
-  Foundational Security Best Practices, with each remaining finding either fixed or
-  documented as an accepted risk with reasoning.
+- **CloudTrail** — multi-region, log-file validation, feeding an encrypted
+  versioned bucket
+- **GuardDuty** — threat detection
+- **Security Hub** — with CIS Foundations + AWS FSBP standards enabled
+- **IAM Access Analyzer** — external-access findings
+- The org/delegated-admin wiring is commented in, showing where the multi-account
+  version plugs in
 
-## What I did not build
+## The baseline passes its own audit
 
-Prowler and the SRA examples are upstream. My work is the org layout, the baseline
-enablement, and the finding-by-finding remediation write-up.
+A security baseline whose own audit-log bucket is unencrypted and world-readable
+is the joke that writes itself. The CloudTrail bucket ships with a public-access
+block, KMS encryption, versioning, and a least-privilege bucket policy — so
+**Prowler doesn't flag the baseline's own infrastructure.** That was a real gap
+in the first cut; it's fixed and the history shows it.
+
+## The triage step is tested
+
+[`scripts/triage.py`](./scripts/triage.py) rolls Prowler's OCSF-JSON output up by
+severity and service so you can drive it down deliberately. That aggregation is
+the number you act on, so it has **9 offline tests** on synthetic findings — no
+AWS needed — covering the FAIL/FAILED/NEW status variants, severity fallback
+across OCSF shapes, and both JSON-array and JSONL inputs.
+
+```bash
+python -m pytest tests/ -v
+```
+
+CI runs the tests plus `terraform validate`.
+
+## What I didn't build
+
+Prowler and the SRA are upstream. The baseline configuration, the self-hardened
+audit bucket, the triage roller, and the tests are mine.
 
 ---
 
 ## Running it
 
 ```bash
-make baseline       # enable the security services (SRA-aligned)
-make scan           # prowler aws -> findings/prowler-report.html + .json
-make triage         # summarise findings by severity into findings/triage.md
-make destroy        # tear the baseline back down
+terraform -chdir=terraform init
+terraform -chdir=terraform apply
+make scan                              # prowler -> findings/*.ocsf.json
+python scripts/triage.py findings/*.json
+terraform -chdir=terraform destroy
 ```
 
-## The deliverable
+Needs Terraform ≥ 1.9, Prowler, Python 3, and an AWS account (throwaway).
 
-`findings/triage.md` — the before/after that shows judgment, not just tool output:
+## Findings
 
-| Severity | Initial findings | After remediation | Notes |
-|----------|------------------|-------------------|-------|
-| Critical | | | |
-| High | | | |
-| Medium | | | |
+`findings/triage.md` is generated by the triage step. [LAB-NOTES.md](./LAB-NOTES.md)
+is the log.
 
-Then the analysis: which findings are real, which are Prowler being strict about a
-control you've consciously accepted, and how the SRA layout changed the picture vs.
-a flat single-account setup.
+## License
 
-## Cost note
-
-Multi-account with GuardDuty/Config across accounts can accrue cost. The Makefile
-defaults to a **single-account SRA-lite** baseline; opt into true multi-account only
-if you have an org sandbox. Either way, `make destroy` disables the paid services.
-
-## What broke
-
-See [LAB-NOTES.md](./LAB-NOTES.md).
+Lab code: MIT ([LICENSE](./LICENSE)). Upstream tools keep their licenses, credited
+above.

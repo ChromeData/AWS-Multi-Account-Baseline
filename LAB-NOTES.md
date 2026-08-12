@@ -1,36 +1,72 @@
-# Lab Notes — AWS Multi-Account Security Baseline
+# Lab Notes — 09 AWS Multi-Account Baseline
 
-> Running log, newest first.
+Running log. Errors, dead ends, fixes, surprises. Dated, newest at the bottom.
 
-## Known traps (pre-seeded)
+---
 
-### Security Hub standards ARNs are region-specific
+## Format
 
-The CIS and FSBP subscription ARNs differ by partition/region. A wrong ARN fails
-with a not-found that doesn't say "wrong region." Confirm against
-`aws securityhub describe-standards`.
+```
+### YYYY-MM-DD — what I was trying to do
 
-### Config recording is the cost bomb
+**Expected:**
+**Got:**
+**Cause:**
+**Fix:**
+```
 
-Enabling AWS Config across all resource types is where a lab bill actually grows.
-It's commented out by default. Turn it on deliberately, watch cost for a day, and
-note the delta — that awareness is part of the exercise.
+---
 
-### Prowler needs its own permissions
+## Finds and decisions
 
-Prowler runs as your credentials. If checks come back "access denied" rather than
-pass/fail, that's a Prowler IAM gap, not a finding. Use the SecurityAudit +
-`ViewOnlyAccess` managed policies.
+### The baseline failed its own scanner (fixed)
 
-### The goal isn't zero findings
+First cut: the CloudTrail bucket had no encryption, no public-access block, no
+bucket policy. Prowler would flag the security baseline's OWN infrastructure —
+CKV-style S3 findings on the audit log. Added public-access block, KMS
+encryption, versioning, and a least-privilege bucket policy. A baseline has to
+pass the audit it exists to enable.
 
-Some Prowler findings are controls you've consciously not enabled in a lab (e.g.
-org-wide Config). Document those as accepted, don't chase a false 100%.
+### CloudTrail needs the bucket policy first
 
-## YYYY-MM-DD — <first real entry>
+`depends_on = [aws_s3_bucket_policy.trail]` — CloudTrail validates that it can
+write to the bucket at create time. Without the ordering, apply fails with an
+"insufficient bucket permissions" error that doesn't name the race.
 
-**Goal:** · **What happened:** · **Why:** · **Fix:** · **Time lost:**
+### Config recorder left off on purpose
+
+Enabling AWS Config recording across all resource types is the biggest cost lever
+here. It's commented in `main.tf` with the reasoning. Turn it on once a clean
+Prowler run without it is confirmed.
+
+### Triage severity fallback
+
+OCSF exports differ — severity can be under `severity` or `severity_id`. The
+roller falls back across shapes; a test pins it, because a miscounted Critical is
+the worst possible bug in a triage tool.
+
+---
+
+## Known traps (confirm on apply)
+
+- **Security Hub standards take time to evaluate.** Right after apply, findings
+  are sparse because the standards haven't run. Wait before the first Prowler
+  scan or the baseline looks cleaner than it is.
+- **GuardDuty + Security Hub cost.** Small but non-zero. `make destroy` when done.
+- **Prowler needs its own read role.** Confirm it has SecurityAudit +
+  ViewOnlyAccess, or it under-reports and the triage looks falsely clean.
+
+---
 
 ## Open questions
-- [ ] How much did enabling Config actually cost over 24h?
-- [ ] Which findings only appear in a multi-account layout vs. single-account?
+
+- [ ] Starting Prowler finding count, and how far to zero after the baseline?
+- [ ] Which findings are the baseline's own resources vs. account defaults?
+- [ ] Does enabling Config materially change the finding count?
+- [ ] Capture the before/after triage.md for findings/.
+
+---
+
+## Log
+
+_(first entry goes here on the first real apply)_

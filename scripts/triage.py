@@ -43,19 +43,29 @@ def status(item):
     return (item.get("status_code") or item.get("status") or "").upper()
 
 
+def service_of(item):
+    return (item.get("resources", [{}])[0].get("group", {}).get("name")
+            or item.get("cloud", {}).get("service") or "unknown")
+
+
+def rollup(items):
+    """The scoring core: split failing findings out and count them by severity
+    and service. Pure, so tests exercise the exact aggregation the report uses."""
+    fails = [i for i in items if status(i) in ("FAIL", "FAILED", "NEW")]
+    by_sev = Counter(str(sev(i)) for i in fails)
+    by_service = defaultdict(int)
+    for i in fails:
+        by_service[str(service_of(i))] += 1
+    return fails, by_sev, by_service
+
+
 def main():
     paths = sys.argv[1:] or glob.glob(str(FINDINGS / "*.json"))
     if not paths:
         sys.exit("no Prowler JSON found — run 'make scan' first")
 
     items = load(paths)
-    fails = [i for i in items if status(i) in ("FAIL", "FAILED", "NEW")]
-    by_sev = Counter(str(sev(i)) for i in fails)
-    by_service = defaultdict(int)
-    for i in fails:
-        svc = i.get("resources", [{}])[0].get("group", {}).get("name") \
-              or i.get("cloud", {}).get("service") or "unknown"
-        by_service[str(svc)] += 1
+    fails, by_sev, by_service = rollup(items)
 
     lines = ["# Prowler Triage\n",
              f"Total findings parsed: **{len(items)}** · failing: **{len(fails)}**\n",
