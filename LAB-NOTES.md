@@ -154,3 +154,35 @@ up from 9.
 Detail in `findings/localstack-run.txt`.
 
 ---
+
+### 2026-08-12, ran the free half against real AWS, proved the block enforces
+
+The baseline bundles free and paid services. Applied only the free ones with
+`-target`: the S3 trail bucket and its hardening, plus Access Analyzer.
+GuardDuty, Security Hub and CloudTrail were left off deliberately, and confirmed
+disabled at teardown.
+
+Two things proven that LocalStack could not:
+
+**The confused-deputy fix holds on real AWS.** Both bucket-policy statements
+carry `aws:SourceArn` scoped to this account's trail, with the real account ARN
+interpolated.
+
+**The public-access block was observed enforcing.** Reading config back is not
+proof, so I tried to make the audit bucket public:
+
+```
+aws s3api put-bucket-policy ... Principal:"*"
+-> AccessDenied ... because public policies are prevented by the
+   BlockPublicPolicy setting in S3 Block Public Access.
+```
+
+AWS names `BlockPublicPolicy` in the denial. The control refused a real request.
+
+6 resources destroyed. Account swept clean afterwards: no GuardDuty, no Security
+Hub, no buckets, no KMS keys, no secrets, no trails, no Lambda. **Cost: $0.**
+
+GuardDuty and Security Hub detection cannot be proven without charges, so they
+stay config-verified. Detail in `findings/real-aws-run.txt`.
+
+---
