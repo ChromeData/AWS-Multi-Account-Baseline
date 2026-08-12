@@ -78,3 +78,66 @@ class TestLoad:
         p = tmp_path / "empty.json"
         p.write_text("")
         assert triage.load([p]) == []
+
+
+# --- regressions found 2026-08-12 -------------------------------------------
+
+
+def test_ocsf_severity_id_maps_to_a_displayed_label():
+    """A finding with severity_id and no severity string must still show up.
+
+    OCSF severity_id is an integer enum. The original fallback returned it raw,
+    so it stringified to "4" and matched none of the named rows the report
+    iterates. The finding was counted in the total and silently dropped from
+    the severity table: "failing: 2" printed above an empty list.
+    """
+    items = [
+        {"status_code": "FAIL", "severity_id": 4, "resources": [{"group": {"name": "s3"}}]},
+        {"status_code": "FAIL", "severity_id": 5, "resources": [{"group": {"name": "iam"}}]},
+    ]
+    fails, by_sev, _ = triage.rollup(items)
+    assert len(fails) == 2
+    assert by_sev["High"] == 1
+    assert by_sev["Critical"] == 1
+
+    # The real assertion: everything counted is also renderable.
+    named = ("Critical", "High", "Medium", "Low", "Informational", "Unknown")
+    assert sum(by_sev.get(s, 0) for s in named) == len(fails), \
+        "every counted finding must land in a severity the report actually prints"
+
+
+def test_severity_string_wins_over_id():
+    """When Prowler sends both, the human-readable string is authoritative."""
+    items = [{"status_code": "FAIL", "severity": "Medium", "severity_id": 4,
+              "resources": [{"group": {"name": "ec2"}}]}]
+    _, by_sev, _ = triage.rollup(items)
+    assert by_sev["Medium"] == 1
+    assert "High" not in by_sev
+
+
+def test_unknown_severity_id_does_not_vanish():
+    """An id outside the enum still has to be countable and printable."""
+    items = [{"status_code": "FAIL", "severity_id": 99,
+              "resources": [{"group": {"name": "s3"}}]}]
+    fails, by_sev, _ = triage.rollup(items)
+    assert len(fails) == 1
+    assert by_sev["Unknown"] == 1
+
+
+def test_fatal_folds_into_critical():
+    """OCSF 6 is Fatal. The report has no Fatal row, so it must not disappear."""
+    items = [{"status_code": "FAIL", "severity_id": 6,
+              "resources": [{"group": {"name": "iam"}}]}]
+    _, by_sev, _ = triage.rollup(items)
+    assert by_sev["Critical"] == 1
+
+
+def test_string_severity_id_passes_through_as_a_label():
+    """Some exporters put the label directly in severity_id rather than the enum.
+
+    Caught by an existing test when the integer mapping was added: int("Critical")
+    raises, and the first version of the fix swallowed it into "Unknown",
+    turning a correctly-labelled critical finding into an unknown one.
+    """
+    assert triage.sev({"severity_id": "Critical"}) == "Critical"
+    assert triage.sev({"severity_id": 5}) == "Critical"

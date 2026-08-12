@@ -33,10 +33,48 @@ def load(paths):
     return items
 
 
+# OCSF severity_id is an integer enum, not a label. The report renders named
+# severities, so an id has to be translated or the finding is counted and then
+# never displayed.
+#
+# https://schema.ocsf.io/objects/finding — 0 Unknown .. 6 Fatal.
+OCSF_SEVERITY = {
+    0: "Unknown",
+    1: "Informational",
+    2: "Low",
+    3: "Medium",
+    4: "High",
+    5: "Critical",
+    6: "Critical",  # Fatal; folded into Critical, nothing renders "Fatal"
+}
+
+
 def sev(item):
-    # OCSF uses severity_id / status_code; fall back across shapes.
-    return (item.get("severity") or item.get("severity_id")
-            or item.get("finding_info", {}).get("severity") or "Unknown")
+    """Severity as a display label.
+
+    The fallback to severity_id was already here and was broken: it returned
+    the raw integer, which stringifies to "4" and matches none of the named
+    rows the report iterates. A finding arriving with severity_id and no
+    severity string was counted in the total and then silently omitted from
+    the severity table, so the report read "failing: 12" above an empty list.
+
+    Confirmed with a two-finding rollup: 2 counted, 0 displayed.
+    """
+    s = item.get("severity")
+    if s:
+        return str(s)
+
+    sid = item.get("severity_id")
+    if sid is not None:
+        # Two shapes in the wild. OCSF proper puts an integer enum here, but
+        # some exporters put the label straight in. Map the integer; pass a
+        # non-numeric string through as the label it already is.
+        try:
+            return OCSF_SEVERITY.get(int(sid), "Unknown")
+        except (TypeError, ValueError):
+            return str(sid)
+
+    return str(item.get("finding_info", {}).get("severity") or "Unknown")
 
 
 def status(item):

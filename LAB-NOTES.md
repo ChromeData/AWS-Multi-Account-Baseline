@@ -101,3 +101,56 @@ Final run: **9 passed** (`findings/test-run.txt`).
 **Deliberately left off:** the AWS Config recorder, commented in `main.tf`. It's the
 single biggest cost lever here and I want a clean Prowler run without it first, so I
 can attribute the cost and the finding-count change separately.
+
+### 2026-08-12, the audit bucket was a confused deputy
+
+GuardDuty, Security Hub, Access Analyzer and CloudTrail are all LocalStack Pro,
+so the detection half of this baseline cannot run locally. S3 can, and that is
+where the audit evidence actually lives, so I applied the five trail-bucket
+resources with `-target` and read them back from the API.
+
+Two provider settings were needed and neither is obvious. `s3_use_path_style`
+must be true, because LocalStack serves S3 from one host and virtual-host
+addressing does not resolve. And `skip_requesting_account_id` must stay **false**
+here, unlike the other labs: the bucket name interpolates the account id, so
+skipping the lookup leaves it unresolved and the provider dies with a bare
+"plugin failed to respond" that names the bucket and explains nothing.
+
+Encryption `aws:kms`, versioning on, all four public-access flags true. Then the
+bucket policy:
+
+```
+AWSCloudTrailAclCheck    Condition: {}
+AWSCloudTrailWrite       Condition: {"s3:x-amz-acl": "bucket-owner-full-control"}
+```
+
+**Neither statement had `aws:SourceArn`.** The principal is the CloudTrail
+*service*, which is not scoped to an account, so the policy trusted CloudTrail
+globally rather than this account's trail. That is the cross-account
+confused-deputy pattern AWS has documented since 2022 and now bakes into its own
+console-generated policies.
+
+The file's own comment says "a security baseline whose own audit-log bucket is
+unencrypted and world-readable is the joke that writes itself." The encryption
+and public access were fine. The trust boundary was not, and it was the one
+thing not being checked.
+
+Fixed on both statements, re-applied, confirmed on the deployed object. The trail
+ARN is composed from parts rather than read from `aws_cloudtrail.baseline.arn`,
+because the trail `depends_on` the bucket policy and referencing the resource
+directly is a dependency cycle.
+
+**Separate bug, same shape as everything else here.** `scripts/triage.py` counted
+findings whose severity arrived as OCSF `severity_id` and then never showed them:
+the fallback returned the raw integer, `"4"`, which matches none of the named
+rows the report prints. A report reading "failing: 12" above an empty severity
+table. Reproduced at 2 counted / 0 displayed, fixed with the OCSF enum mapping.
+
+My first fix then broke an existing test, correctly: some exporters put the
+*label* in `severity_id`, and `int("Critical")` raised, quietly turning a
+critical finding into an unknown one. Both shapes handled and pinned. 14 tests,
+up from 9.
+
+Detail in `findings/localstack-run.txt`.
+
+---
