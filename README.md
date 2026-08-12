@@ -9,7 +9,7 @@
 | **Domains** | AWS, security |
 | **Built on** | [prowler-cloud/prowler](https://github.com/prowler-cloud/prowler), [aws security reference architecture](https://github.com/aws-samples/aws-security-reference-architecture-examples) |
 | **Cost** | ~$2 to $5. **Runtime** ~5 hours |
-| **Status** | Built and verified. Triage roller tested (9 passing, output in findings/). Not yet applied |
+| **Status** | Trail bucket applied and audited on LocalStack; found a missing aws:SourceArn confused-deputy gap, plus a triage bug dropping findings (findings/). GuardDuty/Hub need a real account |
 
 ## Situation
 
