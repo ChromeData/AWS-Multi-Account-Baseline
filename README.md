@@ -1,5 +1,8 @@
 # Lab 09: AWS Multi Account Security Baseline
 
+<p align="center"><img src="assets/s3-block-enforced.svg" alt="S3 observed refusing a public-policy attempt on real AWS" width="720"></p>
+
+
 [![tests](https://github.com/ChromeData/AWS-Multi-Account-Baseline/actions/workflows/tests.yml/badge.svg)](https://github.com/ChromeData/AWS-Multi-Account-Baseline/actions/workflows/tests.yml)
 
 **Real companies have dozens of AWS accounts, not one. This lays down the security services AWS says every account needs, scans the whole thing with Prowler, and drives the findings to zero. The org wide control plane, not a hobby project.**
