@@ -1,4 +1,4 @@
-# Lab Notes — 09 AWS Multi-Account Baseline
+# Lab Notes, 09 AWS Multi-Account Baseline
 
 Running log. Errors, dead ends, fixes, surprises. Dated, newest at the bottom.
 
@@ -7,7 +7,7 @@ Running log. Errors, dead ends, fixes, surprises. Dated, newest at the bottom.
 ## Format
 
 ```
-### YYYY-MM-DD — what I was trying to do
+### YYYY-MM-DD, what I was trying to do
 
 **Expected:**
 **Got:**
@@ -22,14 +22,13 @@ Running log. Errors, dead ends, fixes, surprises. Dated, newest at the bottom.
 ### The baseline failed its own scanner (fixed)
 
 First cut: the CloudTrail bucket had no encryption, no public-access block, no
-bucket policy. Prowler would flag the security baseline's OWN infrastructure —
-CKV-style S3 findings on the audit log. Added public-access block, KMS
+bucket policy. Prowler would flag the security baseline's OWN infrastructure: CKV-style S3 findings on the audit log. Added public-access block, KMS
 encryption, versioning, and a least-privilege bucket policy. A baseline has to
 pass the audit it exists to enable.
 
 ### CloudTrail needs the bucket policy first
 
-`depends_on = [aws_s3_bucket_policy.trail]` — CloudTrail validates that it can
+`depends_on = [aws_s3_bucket_policy.trail]`. CloudTrail validates that it can
 write to the bucket at create time. Without the ordering, apply fails with an
 "insufficient bucket permissions" error that doesn't name the race.
 
@@ -41,7 +40,7 @@ Prowler run without it is confirmed.
 
 ### Triage severity fallback
 
-OCSF exports differ — severity can be under `severity` or `severity_id`. The
+OCSF exports differ. Severity can be under `severity` or `severity_id`. The
 roller falls back across shapes; a test pins it, because a miscounted Critical is
 the worst possible bug in a triage tool.
 
@@ -69,7 +68,7 @@ the worst possible bug in a triage tool.
 
 ## Log
 
-### 2026-08-12 — the baseline would have failed its own scan
+### 2026-08-12, the baseline would have failed its own scan
 
 Reviewing `main.tf` before the first apply, the CloudTrail bucket had no encryption,
 no public-access block, no versioning, and no bucket policy.
@@ -87,7 +86,7 @@ bucket permissions" error that doesn't name the race as the cause.
 
 ---
 
-### 2026-08-12 — severity fallback in the triage roller
+### 2026-08-12, severity fallback in the triage roller
 
 OCSF exports don't agree on where severity lives: sometimes `severity`, sometimes
 `severity_id`, sometimes nested under `finding_info`. Same for status, which shows up

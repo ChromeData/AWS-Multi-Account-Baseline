@@ -1,7 +1,7 @@
 """Offline tests for the Prowler triage roller.
 
 No AWS, no Prowler run. Synthetic OCSF findings exercise the parsing and rollup,
-because the whole value of the triage step is an accurate count by severity — if
+because the whole value of the triage step is an accurate count by severity, if
 that's wrong, you drive the wrong findings to zero.
 
 Run:  python -m pytest tests/ -v

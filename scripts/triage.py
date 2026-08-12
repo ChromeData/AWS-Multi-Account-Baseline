@@ -62,7 +62,7 @@ def rollup(items):
 def main():
     paths = sys.argv[1:] or glob.glob(str(FINDINGS / "*.json"))
     if not paths:
-        sys.exit("no Prowler JSON found — run 'make scan' first")
+        sys.exit("no Prowler JSON found, run 'make scan' first")
 
     items = load(paths)
     fails, by_sev, by_service = rollup(items)
@@ -84,7 +84,7 @@ def main():
     out = FINDINGS / "triage.md"
     out.write_text("\n".join(lines) + "\n")
     print(f"wrote {out}")
-    print(f"failing findings: {len(fails)} — {dict(by_sev)}")
+    print(f"failing findings: {len(fails)}, {dict(by_sev)}")
 
 
 if __name__ == "__main__":
