@@ -116,9 +116,14 @@ resource "aws_accessanalyzer_analyzer" "baseline" {
 }
 
 # --- AWS Config (recorder + delivery) --------------------------------------
-# Left as a documented TODO to keep first-run cost predictable — enabling Config
-# recording across all resource types is the biggest cost lever in this lab.
-# Turn on per SRA once you've seen a clean Prowler run without it.
+# Deliberately not enabled. Config recording across all resource types is the
+# single biggest cost driver in this baseline, and enabling it at the same time
+# as everything else makes it impossible to attribute either the spend or the
+# change in Prowler's finding count to it.
+#
+# The sequence is: apply this baseline, take a clean Prowler run, record the
+# number, then enable Config and re-run. Two measurements, one variable.
+# See LAB-NOTES.md.
 #
 # resource "aws_config_configuration_recorder" "baseline" { ... }
 
